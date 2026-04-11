@@ -21,10 +21,15 @@ function contieneEnlaceEnTexto(texto) {
     const patrones = [
         /https?:\/\/[^\s]+/gi,
         /t\.me\/[^\s]+/gi,
-        /telegram\.me\/[^\s]+/gi,
-        /@[a-zA-Z0-9_]{5,}/g
+        /telegram\.me\/[^\s]+/gi
     ];
     return patrones.some(p => p.test(texto));
+}
+
+function extraerEnlacesDeTexto(texto) {
+    if (!texto) return [];
+    const patron = /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+)/gi;
+    return texto.match(patron) || [];
 }
 
 function extraerEnlacesDeTexto(texto) {
