@@ -27,12 +27,14 @@ function normalizarTexto(texto) {
 function contienePalabraProhibida(texto) {
     if (!texto) return { contiene: false, palabras: [] };
 
-    // FIX: usar includes() sobre texto normalizado en lugar de \b
-    // porque \b no funciona bien con caracteres especiales del español
     const textoNorm = normalizarTexto(texto);
-    const palabrasEncontradas = PALABRAS_PROHIBIDAS.filter(p =>
-        textoNorm.includes(normalizarTexto(p))
-    );
+    
+    const palabrasEncontradas = PALABRAS_PROHIBIDAS.filter(p => {
+        const palabraNorm = normalizarTexto(p);
+        // Usar regex con límites de palabra para detectar palabra completa
+        const regex = new RegExp(`\\b${palabraNorm}\\b`, 'i');
+        return regex.test(textoNorm);
+    });
 
     return {
         contiene: palabrasEncontradas.length > 0,
@@ -48,41 +50,6 @@ function contieneEmojiProhibido(texto) {
     return {
         contiene: emojisEncontrados.length > 0,
         emojis: emojisEncontrados
-    };
-}
-
-async function filtrarMensajePorContenido(ctx) {
-    const mensaje = ctx.message;
-    if (!mensaje) return { eliminado: false };
-
-    // FIX: revisar texto y caption (fotos/videos)
-    const texto = mensaje.text || mensaje.caption || '';
-    if (!texto) return { eliminado: false };
-
-    const usuario = mensaje.from;
-    const messageId = mensaje.message_id;
-
-    const resultadoPalabras = contienePalabraProhibida(texto);
-    const resultadoEmojis = contieneEmojiProhibido(texto);
-
-    if (!resultadoPalabras.contiene && !resultadoEmojis.contiene) {
-        return { eliminado: false };
-    }
-
-    try {
-        await ctx.deleteMessage(messageId);
-        console.log(`🗑️ Mensaje eliminado por contenido prohibido: usuario ${usuario.id}`);
-    } catch (error) {
-        console.error(`❌ Error al eliminar mensaje: ${error.message}`);
-    }
-
-    return {
-        eliminado: true,
-        razon: 'contenido_prohibido',
-        palabras: resultadoPalabras.palabras,
-        emojis: resultadoEmojis.emojis,
-        usuario,
-        chatId: mensaje.chat.id
     };
 }
 
