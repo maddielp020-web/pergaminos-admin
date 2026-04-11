@@ -67,8 +67,8 @@ async function filtrarMensaje(ctx) {
     const enlacesEntidades = extraerEnlacesDeEntidades(entidades);
 
     // FIX: también detectar si hay entidad tipo url/text_link aunque el texto no lo muestre
-    const hayEnlaceOculto = entidades.some(e => e.type === 'url' || e.type === 'text_link' || e.type === 'mention');
-    const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
+const hayEnlaceOculto = entidades.some(e => e.type === 'url' || e.type === 'text_link');
+const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
 
     if (!hayEnlaceEnTexto && !hayEnlaceOculto) {
         return { eliminado: false };
