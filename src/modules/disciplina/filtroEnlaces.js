@@ -3,7 +3,10 @@ const DOMINIOS_PERMITIDOS = [
     'gutenberg.org',
     'openlibrary.org',
     'archive.org',
-    'pergaminos'
+    't.me/PergaminosLibros_Bot',
+    't.me/PergaminosAdmin_Bot',
+    't.me/PergaminosAbiertosChannel',
+    't.me/+bCKN6JnABA8xZGM6'
 ];
 
 // ==================== FUNCIONES ====================
