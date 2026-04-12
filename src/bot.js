@@ -1,20 +1,46 @@
 // ==================== IMPORTACIONES ====================
 const { Telegraf } = require('telegraf');
-const { BOT_TOKEN, ADMIN_IDS } = require('./config');
-const { filtrarMensaje } = require('./modules/disciplina/filtroEnlaces');
-const { filtrarMensajePorContenido } = require('./modules/disciplina/palabrasProhibidas');
+const { BOT_TOKEN, ADMIN_IDS, CREATEDOR_ID } = require('./config');
+const { filtrarMensaje: filtrarEnlaces } = require('./modules/disciplina/filtroEnlaces');
+const { 
+    filtrarMensajePorContenido, 
+    contienePalabraParaAviso,
+    contienePalabraProhibida,
+    contieneEmojiProhibido
+} = require('./modules/disciplina/palabrasProhibidas');
 const { iniciarFeedback, manejarFeedbackPositivo, manejarFeedbackNegativo } = require('./modules/feedback/botonesFeedback');
-const { notificarEnlaceProhibido, notificarContenidoProhibido } = require('./utils/notificaciones');
+const { 
+    notificarEnlaceProhibido, 
+    notificarContenidoProhibido, 
+    notificarAvisoComando,
+    notificarAvisoEnlaceCreador,
+    notificarAvisoContenidoCreador
+} = require('./utils/notificaciones');
 const { esAdminDelGrupo } = require('./utils/cacheAdmins');
+const { puedeEnviarAviso } = require('./modules/disciplina/rateLimit');
 
 // ==================== CONFIGURACION ====================
 const bot = new Telegraf(BOT_TOKEN);
 
 console.log('🛡️ PergaminosAdmin_Bot - Guardián del grupo');
-console.log(`👑 Administradores: ${ADMIN_IDS.join(', ')}`);
+console.log(`👑 Creador: ${CREATEDOR_ID}`);
+console.log(`🛡️ Admins adicionales: ${ADMIN_IDS.filter(id => id !== CREATEDOR_ID).join(', ') || 'ninguno'}`);
 
-// ==================== HELPER: AVISO TEMPORAL ====================
-// FIX: avisar al usuario cuando su mensaje es eliminado, y borrar el aviso después de 8s
+// ==================== HELPERS ====================
+function esComandoBot(mensaje) {
+    if (!mensaje || !mensaje.entities) return false;
+    return mensaje.entities.some(e => e.type === 'bot_command');
+}
+
+function esCreador(userId) {
+    return userId === CREATEDOR_ID;
+}
+
+function esAdminSinFiltro(userId) {
+    // Es admin pero NO es el creador
+    return ADMIN_IDS.includes(userId) && userId !== CREATEDOR_ID;
+}
+
 async function avisarYBorrar(ctx, texto) {
     try {
         const aviso = await ctx.reply(texto);
@@ -30,7 +56,6 @@ async function avisarYBorrar(ctx, texto) {
 bot.use(async (ctx, next) => {
     const chatType = ctx.chat?.type;
 
-    // Solo actuar en grupos y supergrupos
     if (chatType !== 'group' && chatType !== 'supergroup') {
         return next();
     }
@@ -39,40 +64,123 @@ bot.use(async (ctx, next) => {
     if (!mensaje) return next();
 
     const usuario = mensaje.from;
+    const userId = usuario.id;
+    const texto = mensaje.text || mensaje.caption || '';
 
-    // FIX: usar cache para verificar admin — evita rate limit con muchos mensajes
-    const esAdmin = await esAdminDelGrupo(ctx.telegram, ctx.chat.id, usuario.id);
-    if (esAdmin) return next();
-
-    // 1. FILTRO DE ENLACES (incluye entidades ocultas y captions)
-    const resultadoEnlaces = await filtrarMensaje(ctx);
-    if (resultadoEnlaces.eliminado) {
-        await notificarEnlaceProhibido(
-            ctx.telegram,
-            resultadoEnlaces.usuario,
-            resultadoEnlaces.enlaces
-        );
-        // FIX: avisar al usuario en lugar de silencio total
-        await avisarYBorrar(ctx,
-            `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener enlaces no permitidos en este grupo.`
-        );
-        return;
+    // ========== VERIFICACIÓN DE ADMIN (SIN FILTRO) ==========
+    // Los admins que NO son el creador: sin filtro, sin avisos
+    if (esAdminSinFiltro(userId)) {
+        return next();
     }
 
-    // 2. FILTRO DE PALABRAS Y EMOJIS PROHIBIDOS
-    const resultadoContenido = await filtrarMensajePorContenido(ctx);
-    if (resultadoContenido.eliminado) {
-        await notificarContenidoProhibido(
-            ctx.telegram,
-            resultadoContenido.usuario,
-            resultadoContenido.palabras,
-            resultadoContenido.emojis
-        );
-        // FIX: avisar al usuario
-        await avisarYBorrar(ctx,
-            `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener contenido no permitido en este grupo.`
-        );
-        return;
+    // Verificar si es admin del grupo (para otros admins no listados en ADMIN_IDS)
+    const esAdminGrupo = await esAdminDelGrupo(ctx.telegram, ctx.chat.id, userId);
+    if (esAdminGrupo && userId !== CREATEDOR_ID) {
+        return next();
+    }
+
+    // ========== DETECCIÓN DE COMANDO ==========
+    const esComando = esComandoBot(mensaje);
+    const esComandoFeedback = texto.startsWith('/feedback');
+    const esCreadorUsuario = esCreador(userId);
+
+    // ========== CASO ESPECIAL: /feedback ==========
+    if (esComandoFeedback) {
+        // NUNCA se borra, independientemente de quién sea o qué contenga
+        return next();
+    }
+
+    // ========== FILTRO DE ENLACES ==========
+    const resultadoEnlaces = await filtrarEnlaces(ctx);
+    if (resultadoEnlaces.eliminado) {
+        if (esCreadorUsuario) {
+            // Creador: no borrar, solo avisar
+            await notificarAvisoEnlaceCreador(
+                ctx.telegram,
+                ctx.chat.id,
+                mensaje.message_id,
+                usuario,
+                resultadoEnlaces.enlaces
+            );
+            console.log(`📢 Aviso al creador por su propio enlace no permitido`);
+            return next();
+        } else {
+            // Usuario normal: borrar y notificar
+            await notificarEnlaceProhibido(
+                ctx.telegram,
+                resultadoEnlaces.usuario,
+                resultadoEnlaces.enlaces,
+                false
+            );
+            await avisarYBorrar(ctx,
+                `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener enlaces no permitidos.`
+            );
+            return;
+        }
+    }
+
+    // ========== SI ES COMANDO (que no sea /feedback) ==========
+    if (esComando) {
+        const resultadoAviso = contienePalabraParaAviso(texto);
+        
+        if (resultadoAviso.contiene && resultadoAviso.palabras.length > 0) {
+            const puedeAvisar = puedeEnviarAviso(userId);
+            
+            if (puedeAvisar) {
+                await notificarAvisoComando(
+                    ctx.telegram,
+                    ctx.chat.id,
+                    mensaje.message_id,
+                    usuario,
+                    texto,
+                    resultadoAviso.palabras[0],
+                    esCreadorUsuario
+                );
+                console.log(`📢 Aviso por comando de ${usuario.id}: "${resultadoAviso.palabras[0]}"`);
+            } else {
+                console.log(`⏱️ Rate-limit alcanzado para usuario ${usuario.id}`);
+            }
+        }
+        
+        // Los comandos NUNCA se borran por contenido
+        return next();
+    }
+
+    // ========== MENSAJE NORMAL (NO COMANDO) ==========
+    const resultadoPalabras = contienePalabraProhibida(texto);
+    const resultadoEmojis = contieneEmojiProhibido(texto);
+    const tieneContenidoProhibido = resultadoPalabras.contiene || resultadoEmojis.contiene;
+
+    if (tieneContenidoProhibido) {
+        if (esCreadorUsuario) {
+            // Creador: no borrar, solo avisar
+            await notificarAvisoContenidoCreador(
+                ctx.telegram,
+                ctx.chat.id,
+                mensaje.message_id,
+                usuario,
+                resultadoPalabras.palabras,
+                resultadoEmojis.emojis
+            );
+            console.log(`📢 Aviso al creador por su propio contenido prohibido`);
+            return next();
+        } else {
+            // Usuario normal: borrar y notificar
+            const resultadoContenido = await filtrarMensajePorContenido(ctx);
+            if (resultadoContenido.eliminado) {
+                await notificarContenidoProhibido(
+                    ctx.telegram,
+                    resultadoContenido.usuario,
+                    resultadoContenido.palabras,
+                    resultadoContenido.emojis,
+                    false
+                );
+                await avisarYBorrar(ctx,
+                    `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener contenido no permitido.`
+                );
+                return;
+            }
+        }
     }
 
     return next();
@@ -111,8 +219,6 @@ bot.command('ayuda', async (ctx) => {
 });
 
 // ==================== HANDLER_FEEDBACK ====================
-// FIX: el feedback lo inicia el usuario con /feedback
-// porque Telegram no entrega mensajes de bots a otros bots
 bot.command('feedback', iniciarFeedback);
 
 // ==================== CALLBACKS_FEEDBACK ====================
