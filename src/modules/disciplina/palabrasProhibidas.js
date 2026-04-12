@@ -1,10 +1,23 @@
 // ==================== FILTRO_PALABRAS ====================
+// Estas palabras se BORRAN en mensajes normales (no comandos)
 const PALABRAS_PROHIBIDAS = [
-    'puta', 'puto', 'mierda', 'joder', 'cono', 'cabron', 'cabrona',
+    'puta', 'puto', 'mierda', 'cono', 'cabron', 'cabrona',
     'pendejo', 'pendeja', 'idiota', 'estupido', 'estupida',
     'imbecil', 'maldito', 'maldita',
     'spam', 'estafa', 'fraude',
     'odio', 'muerte', 'matar', 'violar'
+];
+
+// ==================== PALABRAS_PARA_AVISO ====================
+// Estas palabras solo generan AVISO en comandos, NUNCA se borran
+// Lista refinada sin duplicados con PALABRAS_PROHIBIDAS
+const PALABRAS_PARA_AVISO = [
+    'zorra',
+    'cojones',
+    'coño',
+    'gilipollas',
+    'cabrón',
+    'joder'
 ];
 
 const EMOJIS_PROHIBIDOS = [
@@ -31,7 +44,23 @@ function contienePalabraProhibida(texto) {
     
     const palabrasEncontradas = PALABRAS_PROHIBIDAS.filter(p => {
         const palabraNorm = normalizarTexto(p);
-        // Usar regex con límites de palabra para detectar palabra completa
+        const regex = new RegExp(`\\b${palabraNorm}\\b`, 'i');
+        return regex.test(textoNorm);
+    });
+
+    return {
+        contiene: palabrasEncontradas.length > 0,
+        palabras: palabrasEncontradas
+    };
+}
+
+function contienePalabraParaAviso(texto) {
+    if (!texto) return { contiene: false, palabras: [] };
+
+    const textoNorm = normalizarTexto(texto);
+    
+    const palabrasEncontradas = PALABRAS_PARA_AVISO.filter(p => {
+        const palabraNorm = normalizarTexto(p);
         const regex = new RegExp(`\\b${palabraNorm}\\b`, 'i');
         return regex.test(textoNorm);
     });
@@ -57,7 +86,6 @@ async function filtrarMensajePorContenido(ctx) {
     const mensaje = ctx.message;
     if (!mensaje) return { eliminado: false };
 
-    // FIX: revisar texto y caption (fotos/videos)
     const texto = mensaje.text || mensaje.caption || '';
     if (!texto) return { eliminado: false };
 
@@ -91,8 +119,10 @@ async function filtrarMensajePorContenido(ctx) {
 // ==================== EXPORTS ====================
 module.exports = {
     contienePalabraProhibida,
+    contienePalabraParaAviso,
     contieneEmojiProhibido,
     filtrarMensajePorContenido,
     PALABRAS_PROHIBIDAS,
+    PALABRAS_PARA_AVISO,
     EMOJIS_PROHIBIDOS
 };
