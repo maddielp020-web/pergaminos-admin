@@ -53,6 +53,41 @@ function contieneEmojiProhibido(texto) {
     };
 }
 
+async function filtrarMensajePorContenido(ctx) {
+    const mensaje = ctx.message;
+    if (!mensaje) return { eliminado: false };
+
+    // FIX: revisar texto y caption (fotos/videos)
+    const texto = mensaje.text || mensaje.caption || '';
+    if (!texto) return { eliminado: false };
+
+    const usuario = mensaje.from;
+    const messageId = mensaje.message_id;
+
+    const resultadoPalabras = contienePalabraProhibida(texto);
+    const resultadoEmojis = contieneEmojiProhibido(texto);
+
+    if (!resultadoPalabras.contiene && !resultadoEmojis.contiene) {
+        return { eliminado: false };
+    }
+
+    try {
+        await ctx.deleteMessage(messageId);
+        console.log(`🗑️ Mensaje eliminado por contenido prohibido: usuario ${usuario.id}`);
+    } catch (error) {
+        console.error(`❌ Error al eliminar mensaje: ${error.message}`);
+    }
+
+    return {
+        eliminado: true,
+        razon: 'contenido_prohibido',
+        palabras: resultadoPalabras.palabras,
+        emojis: resultadoEmojis.emojis,
+        usuario,
+        chatId: mensaje.chat.id
+    };
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
     contienePalabraProhibida,
