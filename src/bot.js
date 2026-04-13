@@ -26,6 +26,68 @@ console.log('🛡️ PergaminosAdmin_Bot - Guardián del grupo');
 console.log(`👑 Creador: ${CREATEDOR_ID}`);
 console.log(`🛡️ Admins adicionales: ${ADMIN_IDS.filter(id => id !== CREATEDOR_ID).join(', ') || 'ninguno'}`);
 
+// ==================== MENSAJE_REDIRECCION_PRIVADO ====================
+const MENSAJE_REDIRECCION = `🛡️ El guardián levanta la vista.
+
+Trabajo dentro del grupo PergaminosAbiertos. Allí escucho, guío y protejo el silencio de la biblioteca.
+
+🏛️ Únete al grupo y escríbeme allí:
+🔗 https://t.me/Pergaminos_Abiertos
+
+Allí también te espera el bibliotecario @PergaminosLibros_Bot para buscar los libros que deseas.
+
+🕯️ El guardián siempre escucha.`;
+
+// ==================== MIDDLEWARE_CHAT_PRIVADO ====================
+bot.use(async (ctx, next) => {
+    const chatType = ctx.chat?.type;
+    const userId = ctx.from?.id;
+
+    // Solo aplicar en chats privados
+    if (chatType !== 'private') {
+        return next();
+    }
+
+    // Si es el creador, permitir todo
+    if (userId === CREATEDOR_ID) {
+        console.log(`👑 Creador en privado - acceso permitido`);
+        return next();
+    }
+
+    // Cualquier otro usuario: redirigir y NO procesar más
+    console.log(`🚫 Usuario ${userId} intentó usar el bot en privado - redirigido`);
+    await ctx.reply(MENSAJE_REDIRECCION);
+    // No llamar a next() - el mensaje se ignora completamente
+});
+
+// ==================== HELPERS ====================
+function esComandoBot(mensaje) {
+    if (!mensaje || !mensaje.entities) return false;
+    return mensaje.entities.some(e => e.type === 'bot_command');
+}
+
+function esCreador(userId) {
+    return userId === CREATEDOR_ID;
+}
+
+function esAdminSinFiltro(userId) {
+    return ADMIN_IDS.includes(userId) && userId !== CREATEDOR_ID;
+}
+
+async function avisarYBorrar(ctx, texto) {
+    try {
+        const aviso = await ctx.reply(texto);
+        setTimeout(async () => {
+            try {
+                await ctx.telegram.deleteMessage(ctx.chat.id, aviso.message_id);
+            } catch (_) {}
+        }, 8000);
+    } catch (_) {}
+}
+
+// ==================== MIDDLEWARE_DISCIPLINA ====================
+// ... (todo el código existente del middleware de disciplina se mantiene IGUAL) ...
+
 // ==================== HELPERS ====================
 function esComandoBot(mensaje) {
     if (!mensaje || !mensaje.entities) return false;
@@ -192,18 +254,25 @@ return next();
 
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
-    await ctx.reply(
-        '🛡️ <b>PergaminosAdmin_Bot</b>\n\n' +
-        'Soy el guardián del grupo PergaminosAbiertos.\n\n' +
-        '<b>Mis funciones:</b>\n' +
-        '• Elimino enlaces no permitidos\n' +
-        '• Elimino palabras y emojis prohibidos\n' +
-        '• Recibo feedback sobre los resultados de búsqueda\n\n' +
-        '<b>Comandos disponibles:</b>\n' +
-        '/feedback — ¿Te fue útil la última búsqueda?\n' +
-        '/ayuda — Ver esta ayuda',
-        { parse_mode: 'HTML' }
-    );
+    const chatType = ctx.chat?.type;
+    const userId = ctx.from?.id;
+    
+    // Solo responder en chat privado Y solo al creador
+    if (chatType === 'private' && userId === CREATEDOR_ID) {
+        await ctx.reply(
+            '🛡️ <b>PergaminosAdmin_Bot</b>\n\n' +
+            'Soy el guardián del grupo PergaminosAbiertos.\n\n' +
+            '<b>Mis funciones:</b>\n' +
+            '• Elimino enlaces no permitidos\n' +
+            '• Elimino palabras y emojis prohibidos\n' +
+            '• Recibo feedback sobre los resultados de búsqueda\n\n' +
+            '<b>Comandos disponibles:</b>\n' +
+            '/feedback — ¿Te fue útil la última búsqueda?\n' +
+            '/ayuda — Ver esta ayuda',
+            { parse_mode: 'HTML' }
+        );
+    }
+    // En el grupo o en privado sin ser creador: NO RESPONDER
 });
 
 // ==================== HANDLER_START ====================
