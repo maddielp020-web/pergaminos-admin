@@ -187,6 +187,12 @@ if (tieneContenidoProhibido) {
     }
 }
 
+    return next();
+}
+
+// ==================== HANDLER_START ====================
+bot.command('start', async (ctx) => {
+
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
     await ctx.reply(
