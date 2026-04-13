@@ -108,7 +108,7 @@ async function notificarAvisoEnlaceCreador(telegram, chatId, messageId, usuario,
         `👤 <b>Usuario:</b> ${nombre} (ID: <code>${usuario.id}</code>)\n` +
         `🔗 <b>Enlace(s):</b>\n• ${enlacesStr}\n\n` +
         `🔗 <b>Enlace al mensaje:</b> ${enlaceMensaje}\n\n` +
-        `ℹ️ <i>El mensaje NO fue eliminado porque eres el creador.</i>`;
+        `ℹ️ <i>El mensaje fue ELIMINADO porque contenía un enlace no permitido. Si necesitas publicar un enlace oficial, agrégalo a la lista blanca en el código.</i>`;
 
     await notificarCreador(telegram, mensaje);
 }
@@ -130,7 +130,7 @@ async function notificarAvisoContenidoCreador(telegram, chatId, messageId, usuar
         `👤 <b>Usuario:</b> ${nombre} (ID: <code>${usuario.id}</code>)\n` +
         detalles +
         `\n🔗 <b>Enlace al mensaje:</b> ${enlaceMensaje}\n\n` +
-        `ℹ️ <i>El mensaje NO fue eliminado porque eres el creador.</i>`;
+        `ℹ️ <i>El mensaje fue ELIMINADO porque contenía una palabra o emoji prohibido. La disciplina empieza por ti, creador.</i>`;
 
     await notificarCreador(telegram, mensaje);
 }
