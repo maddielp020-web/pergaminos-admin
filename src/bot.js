@@ -185,7 +185,6 @@ if (tieneContenidoProhibido) {
         }
         return;
     }
-}
     return next();
 }
 
