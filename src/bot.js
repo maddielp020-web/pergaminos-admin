@@ -205,6 +205,22 @@ bot.command('start', async (ctx) => {
     );
 });
 
+// ==================== HANDLER_START ====================
+bot.command('start', async (ctx) => {
+    await ctx.reply(
+        '🛡️ <b>PergaminosAdmin_Bot</b>\n\n' +
+        'Soy el guardián del grupo PergaminosAbiertos.\n\n' +
+        '<b>Mis funciones:</b>\n' +
+        '• Elimino enlaces no permitidos\n' +
+        '• Elimino palabras y emojis prohibidos\n' +
+        '• Recibo feedback sobre los resultados de búsqueda\n\n' +
+        '<b>Comandos disponibles:</b>\n' +
+        '/feedback — ¿Te fue útil la última búsqueda?\n' +
+        '/ayuda — Ver esta ayuda',
+        { parse_mode: 'HTML' }
+    );
+});
+
 // ==================== HANDLER_AYUDA ====================
 bot.command('ayuda', async (ctx) => {
     await ctx.reply(
