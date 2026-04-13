@@ -32,7 +32,7 @@ async function notificarAdministradores(telegram, mensaje) {
  */
 async function notificarCreador(telegram, mensaje) {
     try {
-        await telegram.sendMessage(CREADOR_ID, mensaje, { parse_mode: 'HTML' });
+        telegram.sendMessage(CREATEDOR_ID, mensaje, { parse_mode: 'HTML' });
     } catch (error) {
         console.error(`❌ Error al notificar al creador: ${error.message}`);
     }
