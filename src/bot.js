@@ -146,14 +146,23 @@ bot.use(async (ctx, next) => {
         return next();
     }
 
-    // ========== MENSAJE NORMAL (NO COMANDO) ==========
+   // ========== MENSAJE NORMAL (NO COMANDO) ==========
+    console.log(`📝 Mensaje normal detectado: "${texto.substring(0, 100)}" (usuario: ${userId})`);
+    
     const resultadoPalabras = contienePalabraProhibida(texto);
     const resultadoEmojis = contieneEmojiProhibido(texto);
     const tieneContenidoProhibido = resultadoPalabras.contiene || resultadoEmojis.contiene;
+    
+    console.log(`   Palabras prohibidas encontradas: ${resultadoPalabras.palabras.join(', ') || 'NINGUNA'}`);
+    console.log(`   Emojis prohibidos encontrados: ${resultadoEmojis.emojis.join(', ') || 'NINGUNO'}`);
+    console.log(`   tieneContenidoProhibido: ${tieneContenidoProhibido}`);
 
     if (tieneContenidoProhibido) {
+        console.log(`🔴 Contenido prohibido detectado. esCreadorUsuario: ${esCreadorUsuario}`);
+        
         if (esCreadorUsuario) {
             // Creador: no borrar, solo avisar
+            console.log(`📢 Enviando aviso al creador por su propio contenido prohibido...`);
             await notificarAvisoContenidoCreador(
                 ctx.telegram,
                 ctx.chat.id,
@@ -162,12 +171,16 @@ bot.use(async (ctx, next) => {
                 resultadoPalabras.palabras,
                 resultadoEmojis.emojis
             );
-            console.log(`📢 Aviso al creador por su propio contenido prohibido`);
+            console.log(`✅ Aviso enviado al creador`);
             return next();
         } else {
             // Usuario normal: borrar y notificar
+            console.log(`🗑️ Usuario normal. Intentando borrar mensaje...`);
             const resultadoContenido = await filtrarMensajePorContenido(ctx);
+            console.log(`   Resultado de filtrarMensajePorContenido: eliminado=${resultadoContenido.eliminado}`);
+            
             if (resultadoContenido.eliminado) {
+                console.log(`✅ Mensaje eliminado. Enviando notificaciones...`);
                 await notificarContenidoProhibido(
                     ctx.telegram,
                     resultadoContenido.usuario,
@@ -178,9 +191,14 @@ bot.use(async (ctx, next) => {
                 await avisarYBorrar(ctx,
                     `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener contenido no permitido.`
                 );
+                console.log(`✅ Notificaciones enviadas.`);
                 return;
+            } else {
+                console.log(`❌ No se pudo eliminar el mensaje. Revisar función filtrarMensajePorContenido.`);
             }
         }
+    } else {
+        console.log(`✅ No se detectó contenido prohibido. Mensaje normal permitido.`);
     }
 
     return next();
