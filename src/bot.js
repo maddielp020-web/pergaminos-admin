@@ -185,8 +185,10 @@ if (tieneContenidoProhibido) {
         }
         return;
     }
-    return next();
 }
+
+return next();
+});
 
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
