@@ -147,22 +147,19 @@ bot.use(async (ctx, next) => {
     }
 
    // ========== MENSAJE NORMAL (NO COMANDO) ==========
-    console.log(`📝 Mensaje normal detectado: "${texto.substring(0, 100)}" (usuario: ${userId})`);
-    
-    const resultadoPalabras = contienePalabraProhibida(texto);
-    const resultadoEmojis = contieneEmojiProhibido(texto);
-    const tieneContenidoProhibido = resultadoPalabras.contiene || resultadoEmojis.contiene;
-    
-    console.log(`   Palabras prohibidas encontradas: ${resultadoPalabras.palabras.join(', ') || 'NINGUNA'}`);
-    console.log(`   Emojis prohibidos encontrados: ${resultadoEmojis.emojis.join(', ') || 'NINGUNO'}`);
-    console.log(`   tieneContenidoProhibido: ${tieneContenidoProhibido}`);
+const resultadoPalabras = contienePalabraProhibida(texto);
+const resultadoEmojis = contieneEmojiProhibido(texto);
+const tieneContenidoProhibido = resultadoPalabras.contiene || resultadoEmojis.contiene;
 
-    if (tieneContenidoProhibido) {
-        console.log(`🔴 Contenido prohibido detectado. esCreadorUsuario: ${esCreadorUsuario}`);
-        
+if (tieneContenidoProhibido) {
+    // Tanto creador como usuarios normales: borrar el mensaje
+    // La única diferencia es el tipo de aviso que se envía
+    console.log(`🗑️ Contenido prohibido detectado. Borrando mensaje...`);
+    const resultadoContenido = await filtrarMensajePorContenido(ctx);
+    
+    if (resultadoContenido.eliminado) {
         if (esCreadorUsuario) {
-            // Creador: no borrar, solo avisar
-            console.log(`📢 Enviando aviso al creador por su propio contenido prohibido...`);
+            // Creador: aviso especial (pero el mensaje YA SE BORRÓ)
             await notificarAvisoContenidoCreador(
                 ctx.telegram,
                 ctx.chat.id,
@@ -171,38 +168,24 @@ bot.use(async (ctx, next) => {
                 resultadoPalabras.palabras,
                 resultadoEmojis.emojis
             );
-            console.log(`✅ Aviso enviado al creador`);
-            return next();
+            console.log(`✅ Mensaje del creador borrado y aviso enviado.`);
         } else {
-            // Usuario normal: borrar y notificar
-            console.log(`🗑️ Usuario normal. Intentando borrar mensaje...`);
-            const resultadoContenido = await filtrarMensajePorContenido(ctx);
-            console.log(`   Resultado de filtrarMensajePorContenido: eliminado=${resultadoContenido.eliminado}`);
-            
-            if (resultadoContenido.eliminado) {
-                console.log(`✅ Mensaje eliminado. Enviando notificaciones...`);
-                await notificarContenidoProhibido(
-                    ctx.telegram,
-                    resultadoContenido.usuario,
-                    resultadoContenido.palabras,
-                    resultadoContenido.emojis,
-                    false
-                );
-                await avisarYBorrar(ctx,
-                    `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener contenido no permitido.`
-                );
-                console.log(`✅ Notificaciones enviadas.`);
-                return;
-            } else {
-                console.log(`❌ No se pudo eliminar el mensaje. Revisar función filtrarMensajePorContenido.`);
-            }
+            // Usuario normal: aviso estándar + aviso temporal en el grupo
+            await notificarContenidoProhibido(
+                ctx.telegram,
+                resultadoContenido.usuario,
+                resultadoContenido.palabras,
+                resultadoContenido.emojis,
+                false
+            );
+            await avisarYBorrar(ctx,
+                `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener contenido no permitido.`
+            );
+            console.log(`✅ Mensaje de usuario normal borrado y notificaciones enviadas.`);
         }
-    } else {
-        console.log(`✅ No se detectó contenido prohibido. Mensaje normal permitido.`);
+        return;
     }
-
-    return next();
-});
+}
 
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
