@@ -191,9 +191,6 @@ if (tieneContenidoProhibido) {
 
 // ==================== HANDLER_START ====================
 bot.command('start', async (ctx) => {
-
-// ==================== HANDLER_START ====================
-bot.command('start', async (ctx) => {
     await ctx.reply(
         '🛡️ <b>PergaminosAdmin_Bot</b>\n\n' +
         'Soy el guardián del grupo PergaminosAbiertos.\n\n' +
