@@ -14,6 +14,7 @@ const {
     notificarContenidoProhibido, 
     notificarAvisoComando,
     notificarAvisoEnlaceCreador,
+    notificarAvisoEnlaceCreadorNoOficial,
     notificarAvisoContenidoCreador
 } = require('./utils/notificaciones');
 const { esAdminDelGrupo } = require('./utils/cacheAdmins');
@@ -155,16 +156,19 @@ bot.use(async (ctx, next) => {
     // ========== FILTRO DE ENLACES ==========
     const resultadoEnlaces = await filtrarEnlaces(ctx);
     if (resultadoEnlaces.eliminado) {
-        if (esCreadorUsuario) {
-            // Creador: no borrar, solo avisar
-            await notificarAvisoEnlaceCreador(
+        if (esCreadorUsuario && resultadoEnlaces.razon === 'enlace_no_oficial_creador') {
+            // Creador con enlace NO oficial: el mensaje YA fue borrado en filtrarEnlaces
+            await notificarAvisoEnlaceCreadorNoOficial(
                 ctx.telegram,
                 ctx.chat.id,
                 mensaje.message_id,
                 usuario,
                 resultadoEnlaces.enlaces
             );
-            console.log(`📢 Aviso al creador por su propio enlace no permitido`);
+            console.log(`📢 Aviso al creador por enlace NO oficial - mensaje eliminado`);
+            return;
+        } else if (esCreadorUsuario) {
+            // Creador con otro tipo de enlace prohibido (no debería llegar aquí con el nuevo diseño)
             return next();
         } else {
             // Usuario normal: borrar y notificar
