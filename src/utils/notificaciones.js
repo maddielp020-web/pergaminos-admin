@@ -148,6 +148,26 @@ async function notificarFeedbackNegativo(telegram, usuario, textoFeedback, messa
     await notificarCreador(telegram, mensaje);
 }
 
+/**
+ * Aviso para el creador cuando publica un enlace NO oficial
+ * El mensaje YA fue eliminado en filtroEnlaces.js
+ */
+async function notificarAvisoEnlaceCreadorNoOficial(telegram, chatId, messageId, usuario, enlaces) {
+    const nombre = usuario.username ? `@${esc(usuario.username)}` : esc(usuario.first_name);
+    const enlaceMensaje = construirEnlaceMensaje(chatId, messageId);
+    const enlacesStr = enlaces.map(e => esc(e)).join('\n• ');
+
+    const mensaje =
+        `🚫 <b>ENLACE PROHIBIDO DETECTADO (CREADOR)</b>\n\n` +
+        `👤 <b>Usuario:</b> ${nombre} (ID: <code>${usuario.id}</code>)\n` +
+        `🔗 <b>Enlace(s) no permitido:</b>\n• ${enlacesStr}\n\n` +
+        `🔗 <b>Enlace al mensaje:</b> ${enlaceMensaje}\n\n` +
+        `ℹ️ <i>El mensaje fue ELIMINADO porque contenía un enlace no permitido.\n` +
+        `   Si necesitas publicar este enlace como oficial, agrégarlo a la lista blanca ENLACES_OFICIALES.</i>`;
+
+    await notificarCreador(telegram, mensaje);
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
     notificarAdministradores,
@@ -158,5 +178,6 @@ module.exports = {
     notificarAvisoEnlaceCreador,
     notificarAvisoContenidoCreador,
     notificarFeedbackNegativo,
+    notificarAvisoEnlaceCreadorNoOficial,
     construirEnlaceMensaje
 };
