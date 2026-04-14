@@ -9,20 +9,7 @@ const DOMINIOS_PERMITIDOS = [
     't.me/+bCKN6JnABA8xZGM6'
 ];
 
-// ==================== FILTRO_ENLACES ====================
-const DOMINIOS_PERMITIDOS = [
-    'gutenberg.org',
-    'openlibrary.org',
-    'archive.org',
-    't.me/PergaminosLibros_Bot',
-    't.me/PergaminosAdmin_Bot',
-    't.me/PergaminosAbiertosChannel',
-    't.me/+bCKN6JnABA8xZGM6'
-];
-
 // ==================== ENLACES_OFICIALES_CREADOR ====================
-// Estos enlaces NUNCA se borran si los publica el creador
-// Coincidencia EXACTA, no subcadenas
 const ENLACES_OFICIALES = [
     'https://t.me/Pergaminos_Abiertos',
     'https://t.me/Pergaminos_Channel',
