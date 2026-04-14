@@ -9,6 +9,42 @@ const DOMINIOS_PERMITIDOS = [
     't.me/+bCKN6JnABA8xZGM6'
 ];
 
+// ==================== FILTRO_ENLACES ====================
+const DOMINIOS_PERMITIDOS = [
+    'gutenberg.org',
+    'openlibrary.org',
+    'archive.org',
+    't.me/PergaminosLibros_Bot',
+    't.me/PergaminosAdmin_Bot',
+    't.me/PergaminosAbiertosChannel',
+    't.me/+bCKN6JnABA8xZGM6'
+];
+
+// ==================== ENLACES_OFICIALES_CREADOR ====================
+// Estos enlaces NUNCA se borran si los publica el creador
+// Coincidencia EXACTA, no subcadenas
+const ENLACES_OFICIALES = [
+    'https://t.me/Pergaminos_Abiertos',
+    'https://t.me/Pergaminos_Channel',
+    'https://t.me/PergaminosLibros_Bot',
+    'https://t.me/PergaminosAdmin_Bot'
+];
+
+// ==================== FUNCIONES ====================
+function esEnlacePermitido(url) {
+    if (!url) return false;
+    const urlLower = url.toLowerCase();
+    return DOMINIOS_PERMITIDOS.some(dominio => urlLower.includes(dominio));
+}
+
+function esEnlaceOficialCreador(url) {
+    if (!url) return false;
+    // Coincidencia EXACTA
+    return ENLACES_OFICIALES.some(enlace => url === enlace);
+}
+
+// ... resto de funciones existentes (contieneEnlaceEnTexto, extraerEnlacesDeTexto, extraerEnlacesDeEntidades) se mantienen IGUAL ...
+
 // ==================== FUNCIONES ====================
 function esEnlacePermitido(url) {
     if (!url) return false;
@@ -54,28 +90,60 @@ async function filtrarMensaje(ctx) {
     const mensaje = ctx.message;
     if (!mensaje) return { eliminado: false };
 
-    // FIX: revisar tanto message.text como message.caption (fotos/videos con texto)
     const texto = mensaje.text || mensaje.caption || '';
-    // FIX: revisar entidades de texto y de caption
     const entidades = mensaje.entities || mensaje.caption_entities || [];
 
     const usuario = mensaje.from;
+    const userId = usuario.id;
     const messageId = mensaje.message_id;
+    const chatId = mensaje.chat.id;
 
-    // Recopilar todos los enlaces: del texto plano + entidades ocultas
+    // Recopilar todos los enlaces
     const enlacesTexto = extraerEnlacesDeTexto(texto);
     const enlacesEntidades = extraerEnlacesDeEntidades(entidades);
+    const todosLosEnlaces = [...new Set([...enlacesTexto, ...enlacesEntidades])];
 
-    // FIX: también detectar si hay entidad tipo url/text_link aunque el texto no lo muestre
-const hayEnlaceOculto = entidades.some(e => e.type === 'url' || e.type === 'text_link');
-const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
+    const hayEnlaceOculto = entidades.some(e => e.type === 'url' || e.type === 'text_link');
+    const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
 
     if (!hayEnlaceEnTexto && !hayEnlaceOculto) {
         return { eliminado: false };
     }
 
-    // Unir todos los enlaces encontrados y filtrar los no permitidos
-    const todosLosEnlaces = [...new Set([...enlacesTexto, ...enlacesEntidades])];
+    // ========== LÓGICA ESPECIAL PARA EL CREADOR ==========
+    const CREADOR_ID = 2022025893;
+    const esCreador = userId === CREADOR_ID;
+
+    if (esCreador && todosLosEnlaces.length > 0) {
+        // Verificar si TODOS los enlaces son oficiales (coincidencia exacta)
+        const todosSonOficiales = todosLosEnlaces.every(enlace => esEnlaceOficialCreador(enlace));
+        
+        if (todosSonOficiales) {
+            // Enlaces oficiales: NO borrar, NO avisar
+            console.log(`✅ Creador publicó enlace oficial - permitido`);
+            return { eliminado: false };
+        }
+        
+        // Hay enlaces NO oficiales: borrar y marcar para aviso especial
+        const enlacesNoOficiales = todosLosEnlaces.filter(enlace => !esEnlaceOficialCreador(enlace));
+        
+        try {
+            await ctx.deleteMessage(messageId);
+            console.log(`🗑️ Mensaje del creador eliminado por enlace NO oficial`);
+        } catch (error) {
+            console.error(`❌ Error al eliminar mensaje del creador: ${error.message}`);
+        }
+        
+        return {
+            eliminado: true,
+            razon: 'enlace_no_oficial_creador',
+            enlaces: enlacesNoOficiales,
+            usuario,
+            chatId
+        };
+    }
+
+    // ========== LÓGICA PARA USUARIOS NORMALES ==========
     const enlacesNoPermitidos = todosLosEnlaces.filter(e => !esEnlacePermitido(e));
 
     // Si todos los enlaces son de dominios permitidos, dejar pasar
@@ -83,12 +151,10 @@ const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
         return { eliminado: false };
     }
 
-    // Si hay enlace oculto sin URL recuperable, marcarlo igual
     const motivoEliminacion = enlacesNoPermitidos.length > 0
         ? enlacesNoPermitidos
         : ['[enlace oculto detectado en entidades]'];
 
-    // Eliminar mensaje
     try {
         await ctx.deleteMessage(messageId);
         console.log(`🗑️ Mensaje eliminado por enlace no permitido: usuario ${usuario.id}`);
@@ -101,7 +167,7 @@ const hayEnlaceEnTexto = contieneEnlaceEnTexto(texto);
         razon: 'enlaces_no_permitidos',
         enlaces: motivoEliminacion,
         usuario,
-        chatId: mensaje.chat.id
+        chatId
     };
 }
 
