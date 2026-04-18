@@ -6,7 +6,7 @@ const DOMINIOS_PERMITIDOS = [
     't.me/PergaminosLibros_Bot',
     't.me/PergaminosAdmin_Bot',
     't.me/Pergaminos_Channel',
-    'https://t.me/Pergaminos_Abiertos'
+    't.me/Pergaminos_Abiertos'
 ];
 
 // ==================== ENLACES_OFICIALES_CREADOR ====================
