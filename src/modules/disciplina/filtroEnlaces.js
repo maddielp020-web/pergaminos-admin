@@ -5,8 +5,8 @@ const DOMINIOS_PERMITIDOS = [
     'archive.org',
     't.me/PergaminosLibros_Bot',
     't.me/PergaminosAdmin_Bot',
-    't.me/PergaminosAbiertosChannel',
-    't.me/+bCKN6JnABA8xZGM6'
+    't.me/Pergaminos_Channel',
+    'https://t.me/Pergaminos_Abiertos'
 ];
 
 // ==================== ENLACES_OFICIALES_CREADOR ====================
@@ -17,7 +17,9 @@ const ENLACES_OFICIALES = [
     'https://t.me/PergaminosAdmin_Bot'
 ];
 
-// ==================== FUNCIONES ====================
+const CREADOR_ID = 2022025893;
+
+// ==================== FUNCIONES_AUXILIARES ====================
 function esEnlacePermitido(url) {
     if (!url) return false;
     const urlLower = url.toLowerCase();
@@ -26,15 +28,7 @@ function esEnlacePermitido(url) {
 
 function esEnlaceOficialCreador(url) {
     if (!url) return false;
-    // Coincidencia EXACTA
     return ENLACES_OFICIALES.some(enlace => url === enlace);
-}
-
-// ==================== FUNCIONES ====================
-function esEnlacePermitido(url) {
-    if (!url) return false;
-    const urlLower = url.toLowerCase();
-    return DOMINIOS_PERMITIDOS.some(dominio => urlLower.includes(dominio));
 }
 
 function contieneEnlaceEnTexto(texto) {
@@ -53,52 +47,17 @@ function extraerEnlacesDeTexto(texto) {
     return texto.match(patron) || [];
 }
 
-function extraerEnlacesDeTexto(texto) {
-    if (!texto) return [];
-    const patron = /(https?:\/\/[^\s]+|t\.me\/[^\s]+|telegram\.me\/[^\s]+)/gi;
-    return texto.match(patron) || [];
-}
-
-// FIX: extraer enlaces ocultos en entidades de Telegram (links embebidos en texto visible)
 function extraerEnlacesDeEntidades(entidades) {
     if (!entidades || entidades.length === 0) return [];
     const urls = [];
     for (const entidad of entidades) {
-        // type 'url' = enlace visible, type 'text_link' = enlace oculto detrás de texto
         if (entidad.type === 'url' && entidad.url) urls.push(entidad.url);
         if (entidad.type === 'text_link' && entidad.url) urls.push(entidad.url);
     }
     return urls;
 }
 
-// ==================== FILTRO_ENLACES ====================
-const DOMINIOS_PERMITIDOS = [
-    'gutenberg.org',
-    'openlibrary.org',
-    'archive.org',
-    't.me/PergaminosLibros_Bot',
-    't.me/PergaminosAdmin_Bot',
-    't.me/PergaminosAbiertosChannel',
-    't.me/+bCKN6JnABA8xZGM6'
-];
-
-// ==================== ENLACES_OFICIALES_CREADOR ====================
-const ENLACES_OFICIALES = [
-    'https://t.me/Pergaminos_Abiertos',
-    'https://t.me/Pergaminos_Channel',
-    'https://t.me/PergaminosLibros_Bot',
-    'https://t.me/PergaminosAdmin_Bot'
-];
-
-const CREADOR_ID = 2022025893;
-
-// ... funciones auxiliares existentes (esEnlacePermitido, contieneEnlaceEnTexto, etc.) ...
-
-function esEnlaceOficialCreador(url) {
-    if (!url) return false;
-    return ENLACES_OFICIALES.some(enlace => url === enlace);
-}
-
+// ==================== FUNCION_PRINCIPAL ====================
 async function filtrarMensaje(ctx) {
     const mensaje = ctx.message;
     if (!mensaje) return { eliminado: false };
@@ -180,79 +139,11 @@ async function filtrarMensaje(ctx) {
     };
 }
 
+// ==================== EXPORTS ====================
 module.exports = {
     esEnlacePermitido,
     contieneEnlaceEnTexto,
     extraerEnlacesDeTexto,
     filtrarMensaje,
     ENLACES_OFICIALES
-};
-
-    // ========== LÓGICA ESPECIAL PARA EL CREADOR ==========
-    const CREADOR_ID = 2022025893;
-    const esCreador = userId === CREADOR_ID;
-
-    if (esCreador && todosLosEnlaces.length > 0) {
-        // Verificar si TODOS los enlaces son oficiales (coincidencia exacta)
-        const todosSonOficiales = todosLosEnlaces.every(enlace => esEnlaceOficialCreador(enlace));
-        
-        if (todosSonOficiales) {
-            // Enlaces oficiales: NO borrar, NO avisar
-            console.log(`✅ Creador publicó enlace oficial - permitido`);
-            return { eliminado: false };
-        }
-        
-        // Hay enlaces NO oficiales: borrar y marcar para aviso especial
-        const enlacesNoOficiales = todosLosEnlaces.filter(enlace => !esEnlaceOficialCreador(enlace));
-        
-        try {
-            await ctx.deleteMessage(messageId);
-            console.log(`🗑️ Mensaje del creador eliminado por enlace NO oficial`);
-        } catch (error) {
-            console.error(`❌ Error al eliminar mensaje del creador: ${error.message}`);
-        }
-        
-        return {
-            eliminado: true,
-            razon: 'enlace_no_oficial_creador',
-            enlaces: enlacesNoOficiales,
-            usuario,
-            chatId
-        };
-    }
-
-    // ========== LÓGICA PARA USUARIOS NORMALES ==========
-    const enlacesNoPermitidos = todosLosEnlaces.filter(e => !esEnlacePermitido(e));
-
-    // Si todos los enlaces son de dominios permitidos, dejar pasar
-    if (todosLosEnlaces.length > 0 && enlacesNoPermitidos.length === 0) {
-        return { eliminado: false };
-    }
-
-    const motivoEliminacion = enlacesNoPermitidos.length > 0
-        ? enlacesNoPermitidos
-        : ['[enlace oculto detectado en entidades]'];
-
-    try {
-        await ctx.deleteMessage(messageId);
-        console.log(`🗑️ Mensaje eliminado por enlace no permitido: usuario ${usuario.id}`);
-    } catch (error) {
-        console.error(`❌ Error al eliminar mensaje: ${error.message}`);
-    }
-
-    return {
-        eliminado: true,
-        razon: 'enlaces_no_permitidos',
-        enlaces: motivoEliminacion,
-        usuario,
-        chatId
-    };
-}
-
-// ==================== EXPORTS ====================
-module.exports = {
-    esEnlacePermitido,
-    contieneEnlaceEnTexto,
-    extraerEnlacesDeTexto,
-    filtrarMensaje
 };
