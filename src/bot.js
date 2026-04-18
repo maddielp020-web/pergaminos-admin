@@ -1,7 +1,7 @@
 // ==================== IMPORTACIONES ====================
 const { Telegraf } = require('telegraf');
 const { BOT_TOKEN, ADMIN_IDS, CREATEDOR_ID } = require('./config');
-const { filtrarMensaje: filtrarEnlaces } = require('./modules/disciplina/filtroEnlaces');
+const { filtrarMensaje: filtrarEnlaces, ENLACES_OFICIALES } = require('./modules/disciplina/filtroEnlaces');
 const { 
     filtrarMensajePorContenido, 
     contienePalabraParaAviso,
@@ -15,10 +15,25 @@ const {
     notificarAvisoComando,
     notificarAvisoEnlaceCreador,
     notificarAvisoEnlaceCreadorNoOficial,
-    notificarAvisoContenidoCreador
+    notificarAvisoContenidoCreador,
+    notificarAdminEnlaceProhibido,
+    notificarInfraccion1,
+    notificarInfraccion2,
+    notificarInfraccion3Publico,
+    notificarInfraccion3Privado,
+    notificarInfraccion4Publico,
+    notificarInfraccion4Privado,
+    notificarCreadorSuspension,
+    notificarCreadorExpulsion,
+    construirEnlaceMensaje
 } = require('./utils/notificaciones');
 const { esAdminDelGrupo } = require('./utils/cacheAdmins');
 const { puedeEnviarAviso } = require('./modules/disciplina/rateLimit');
+const { 
+    registrarInfraccion, 
+    obtenerInfracciones,
+    estaSuspendido 
+} = require('./modules/disciplina/contadorInfracciones');
 
 // ==================== CONFIGURACION ====================
 const bot = new Telegraf(BOT_TOKEN);
@@ -156,8 +171,12 @@ bot.use(async (ctx, next) => {
     // ========== FILTRO DE ENLACES ==========
     const resultadoEnlaces = await filtrarEnlaces(ctx);
     if (resultadoEnlaces.eliminado) {
+        const username = usuario.username || usuario.first_name;
+        const enlaceMensaje = construirEnlaceMensaje(ctx.chat.id, mensaje.message_id);
+        const enlace = resultadoEnlaces.enlaces[0] || 'enlace detectado';
+        
+        // ===== CASO 1: CREADOR CON ENLACE NO OFICIAL =====
         if (esCreadorUsuario && resultadoEnlaces.razon === 'enlace_no_oficial_creador') {
-            // Creador con enlace NO oficial: el mensaje YA fue borrado en filtrarEnlaces
             await notificarAvisoEnlaceCreadorNoOficial(
                 ctx.telegram,
                 ctx.chat.id,
@@ -167,20 +186,86 @@ bot.use(async (ctx, next) => {
             );
             console.log(`📢 Aviso al creador por enlace NO oficial - mensaje eliminado`);
             return;
-        } else if (esCreadorUsuario) {
-            // Creador con otro tipo de enlace prohibido (no debería llegar aquí con el nuevo diseño)
-            return next();
-        } else {
-            // Usuario normal: borrar y notificar
-            await notificarEnlaceProhibido(
+        }
+        
+        // ===== CASO 2: ADMIN HUMANO (NO CREADOR) =====
+        const esAdmin = await esAdminDelGrupo(ctx.telegram, ctx.chat.id, userId);
+        if (esAdmin && !esCreadorUsuario) {
+            await notificarAdminEnlaceProhibido(
                 ctx.telegram,
-                resultadoEnlaces.usuario,
-                resultadoEnlaces.enlaces,
-                false
+                userId,
+                enlace,
+                username
             );
-            await avisarYBorrar(ctx,
-                `⚠️ ${usuario.first_name}, tu mensaje fue eliminado por contener enlaces no permitidos.`
-            );
+            console.log(`📢 Aviso a admin ${userId} por enlace no permitido`);
+            return;
+        }
+        
+        // ===== CASO 3: USUARIO NORMAL - SISTEMA DE INFRACCIONES =====
+        if (!esAdmin && !esCreadorUsuario) {
+            // Verificar si ya está suspendido
+            if (estaSuspendido(userId)) {
+                console.log(`⏸️ Usuario ${userId} está suspendido - mensaje eliminado sin aviso adicional`);
+                return;
+            }
+            
+            // Registrar infracción
+            const resultado = registrarInfraccion(userId);
+            const infracciones = resultado.infracciones;
+            
+            switch (infracciones) {
+                case 1:
+                    await notificarInfraccion1(ctx.telegram, ctx.chat.id, username);
+                    break;
+                    
+                case 2:
+                    await notificarInfraccion2(ctx.telegram, ctx.chat.id, username);
+                    break;
+                    
+                case 3:
+                    // Suspensión 12h
+                    try {
+                        await ctx.telegram.banChatMember(
+                            ctx.chat.id,
+                            userId,
+                            { until_date: Math.floor(Date.now() / 1000) + 12 * 60 * 60 }
+                        );
+                    } catch (error) {
+                        console.error(`❌ Error al suspender usuario ${userId}: ${error.message}`);
+                    }
+                    
+                    await notificarInfraccion3Publico(ctx.telegram, ctx.chat.id, username);
+                    await notificarInfraccion3Privado(ctx.telegram, userId, username);
+                    await notificarCreadorSuspension(
+                        ctx.telegram,
+                        CREATEDOR_ID,
+                        username,
+                        userId,
+                        enlaceMensaje
+                    );
+                    break;
+                    
+                case 4:
+                    // Expulsión permanente
+                    try {
+                        await ctx.telegram.banChatMember(ctx.chat.id, userId);
+                    } catch (error) {
+                        console.error(`❌ Error al expulsar usuario ${userId}: ${error.message}`);
+                    }
+                    
+                    await notificarInfraccion4Publico(ctx.telegram, ctx.chat.id, username);
+                    await notificarInfraccion4Privado(ctx.telegram, userId, username);
+                    await notificarCreadorExpulsion(
+                        ctx.telegram,
+                        CREATEDOR_ID,
+                        username,
+                        userId,
+                        enlaceMensaje
+                    );
+                    break;
+            }
+            
+            console.log(`📊 Usuario ${userId} - Infracción #${infracciones} por enlace no permitido`);
             return;
         }
     }
