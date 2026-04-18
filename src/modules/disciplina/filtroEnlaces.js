@@ -30,8 +30,6 @@ function esEnlaceOficialCreador(url) {
     return ENLACES_OFICIALES.some(enlace => url === enlace);
 }
 
-// ... resto de funciones existentes (contieneEnlaceEnTexto, extraerEnlacesDeTexto, extraerEnlacesDeEntidades) se mantienen IGUAL ...
-
 // ==================== FUNCIONES ====================
 function esEnlacePermitido(url) {
     if (!url) return false;
@@ -73,6 +71,34 @@ function extraerEnlacesDeEntidades(entidades) {
     return urls;
 }
 
+// ==================== FILTRO_ENLACES ====================
+const DOMINIOS_PERMITIDOS = [
+    'gutenberg.org',
+    'openlibrary.org',
+    'archive.org',
+    't.me/PergaminosLibros_Bot',
+    't.me/PergaminosAdmin_Bot',
+    't.me/PergaminosAbiertosChannel',
+    't.me/+bCKN6JnABA8xZGM6'
+];
+
+// ==================== ENLACES_OFICIALES_CREADOR ====================
+const ENLACES_OFICIALES = [
+    'https://t.me/Pergaminos_Abiertos',
+    'https://t.me/Pergaminos_Channel',
+    'https://t.me/PergaminosLibros_Bot',
+    'https://t.me/PergaminosAdmin_Bot'
+];
+
+const CREADOR_ID = 2022025893;
+
+// ... funciones auxiliares existentes (esEnlacePermitido, contieneEnlaceEnTexto, etc.) ...
+
+function esEnlaceOficialCreador(url) {
+    if (!url) return false;
+    return ENLACES_OFICIALES.some(enlace => url === enlace);
+}
+
 async function filtrarMensaje(ctx) {
     const mensaje = ctx.message;
     if (!mensaje) return { eliminado: false };
@@ -85,7 +111,6 @@ async function filtrarMensaje(ctx) {
     const messageId = mensaje.message_id;
     const chatId = mensaje.chat.id;
 
-    // Recopilar todos los enlaces
     const enlacesTexto = extraerEnlacesDeTexto(texto);
     const enlacesEntidades = extraerEnlacesDeEntidades(entidades);
     const todosLosEnlaces = [...new Set([...enlacesTexto, ...enlacesEntidades])];
@@ -96,6 +121,72 @@ async function filtrarMensaje(ctx) {
     if (!hayEnlaceEnTexto && !hayEnlaceOculto) {
         return { eliminado: false };
     }
+
+    const esCreador = userId === CREADOR_ID;
+
+    // ========== LÓGICA PARA EL CREADOR ==========
+    if (esCreador && todosLosEnlaces.length > 0) {
+        const todosSonOficiales = todosLosEnlaces.every(enlace => esEnlaceOficialCreador(enlace));
+        
+        if (todosSonOficiales) {
+            console.log(`✅ Creador publicó enlace oficial - permitido`);
+            return { eliminado: false };
+        }
+        
+        const enlacesNoOficiales = todosLosEnlaces.filter(enlace => !esEnlaceOficialCreador(enlace));
+        
+        try {
+            await ctx.deleteMessage(messageId);
+            console.log(`🗑️ Mensaje del creador eliminado por enlace NO oficial`);
+        } catch (error) {
+            console.error(`❌ Error al eliminar mensaje del creador: ${error.message}`);
+        }
+        
+        return {
+            eliminado: true,
+            razon: 'enlace_no_oficial_creador',
+            enlaces: enlacesNoOficiales,
+            usuario,
+            chatId,
+            esCreador: true
+        };
+    }
+
+    // ========== LÓGICA PARA USUARIOS NORMALES Y ADMIN ==========
+    const enlacesNoPermitidos = todosLosEnlaces.filter(e => !esEnlacePermitido(e));
+
+    if (todosLosEnlaces.length > 0 && enlacesNoPermitidos.length === 0) {
+        return { eliminado: false };
+    }
+
+    const motivoEliminacion = enlacesNoPermitidos.length > 0
+        ? enlacesNoPermitidos
+        : ['[enlace oculto detectado en entidades]'];
+
+    try {
+        await ctx.deleteMessage(messageId);
+        console.log(`🗑️ Mensaje eliminado por enlace no permitido: usuario ${usuario.id}`);
+    } catch (error) {
+        console.error(`❌ Error al eliminar mensaje: ${error.message}`);
+    }
+
+    return {
+        eliminado: true,
+        razon: 'enlaces_no_permitidos',
+        enlaces: motivoEliminacion,
+        usuario,
+        chatId,
+        primerEnlace: enlacesNoPermitidos[0] || motivoEliminacion[0]
+    };
+}
+
+module.exports = {
+    esEnlacePermitido,
+    contieneEnlaceEnTexto,
+    extraerEnlacesDeTexto,
+    filtrarMensaje,
+    ENLACES_OFICIALES
+};
 
     // ========== LÓGICA ESPECIAL PARA EL CREADOR ==========
     const CREADOR_ID = 2022025893;
