@@ -320,6 +320,16 @@ async function notificarAvisoEnlaceCreadorNoOficial(telegram, chatId, messageId,
     await notificarCreador(telegram, mensaje);
 }
 
+async function notificarFeedbackNegativoLegacy(telegram, usuario, contexto) {
+    const nombre = usuario.username ? `@${esc(usuario.username)}` : esc(usuario.first_name);
+    const mensaje =
+        `👎 <b>FEEDBACK NEGATIVO RECIBIDO</b>\n\n` +
+        `👤 <b>Usuario:</b> ${nombre} (ID: <code>${usuario.id}</code>)\n` +
+        `💬 <b>Contexto:</b> ${esc(contexto)}\n\n` +
+        `🔍 Revisa el grupo para ver qué buscó el usuario.`;
+    await notificarCreador(telegram, mensaje);
+}
+
 // ==================== EXPORTS ====================
 module.exports = {
     notificarAdministradores,
